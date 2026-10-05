@@ -249,7 +249,7 @@ const blankState = () => ({v: VERSION, profiles: [], cur: null, mt: 0});
 let S = blankState();
 let sb = null, session = null, lastRemote = null, syncState = 'local';
 let flushTimer = null, flushing = false, again = false, pending = false;
-let authEmail = '', authStep = 'mail';
+let authEmail = '';
 let soloLocal = false;
 try { soloLocal = localStorage.getItem('mi-rutina-solo-local') === '1'; } catch (e) {}
 
@@ -447,17 +447,12 @@ function render(){
 }
 
 function loginHTML(){
-  const head = '<section class="hero"><div class="logo logo-lg">' + ICON.logo + '</div><h1>Mi Rutina</h1>';
-  if (authStep === 'mail'){
-    return head + '<p class="sub">Entrá con tu mail para guardar tus pesos en tu cuenta. Te enviamos un código, sin contraseña.</p>' +
-      '<div class="card"><label class="fld"><span>Tu mail</span><input id="authMail" type="email" inputmode="email" autocomplete="email" placeholder="tu@mail.com" value="' + esc(authEmail) + '"></label>' +
-      '<button class="btn primary block" data-act="sendcode">Enviarme el código</button></div>' +
-      '<button class="btn ghost block" data-act="sololocal">Seguir sin cuenta, solo en este dispositivo</button></section>';
-  }
-  return head + '<p class="sub">Te enviamos un código de 6 números a <b>' + esc(authEmail) + '</b>. Si no llega, revisá spam.</p>' +
-    '<div class="card"><label class="fld"><span>Código</span><input id="authCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456"></label>' +
-    '<button class="btn primary block" data-act="verifycode">Entrar</button>' +
-    '<button class="btn ghost block" data-act="authback">Cambiar mail</button></div></section>';
+  return '<section class="hero"><div class="logo logo-lg">' + ICON.logo + '</div><h1>Mi Rutina</h1>' +
+    '<p class="sub">Entrá con el mail y la contraseña que te pasamos.</p>' +
+    '<div class="card"><label class="fld"><span>Mail</span><input id="authMail" type="email" inputmode="email" autocomplete="email" placeholder="tu@mail.com" value="' + esc(authEmail) + '"></label>' +
+    '<label class="fld"><span>Contraseña</span><input id="authPass" type="password" autocomplete="current-password"></label>' +
+    '<button class="btn primary block" data-act="pwlogin">Entrar</button></div>' +
+    '<button class="btn ghost block" data-act="sololocal">Seguir sin cuenta, solo en este dispositivo</button></section>';
 }
 function heroHTML(){
   return '<section class="hero"><div class="logo logo-lg">' + ICON.logo + '</div><h1>Mi Rutina</h1>' +
@@ -802,28 +797,20 @@ function parseSets(txt){
 async function onAction(a, el){
   const p = P(), id = el.dataset.id;
   switch (a){
-    case 'sendcode': {
+    case 'pwlogin': {
       const email = ($('#authMail').value || '').trim();
-      if (!email){ toast('Escribí tu mail'); return; }
-      const {error} = await sb.auth.signInWithOtp({email, options: {shouldCreateUser: true}});
-      if (error){ toast('No se pudo enviar el código: ' + error.message); return; }
-      authEmail = email; authStep = 'code'; render(); toast('Te enviamos el código');
-      break;
-    }
-    case 'verifycode': {
-      const token = ($('#authCode').value || '').trim();
-      if (!token){ toast('Escribí el código'); return; }
-      const {data, error} = await sb.auth.verifyOtp({email: authEmail, token, type: 'email'});
-      if (error || !data.session){ toast('Código incorrecto o vencido'); return; }
+      const password = $('#authPass').value || '';
+      if (!email || !password){ toast('Escribí tu mail y tu contraseña'); return; }
+      authEmail = email;
+      const {data, error} = await sb.auth.signInWithPassword({email, password});
+      if (error || !data.session){ toast('Mail o contraseña incorrectos'); return; }
       session = data.session; soloLocal = false;
       try { localStorage.removeItem('mi-rutina-solo-local'); } catch (e) {}
-      authStep = 'mail';
       await startSession(); render(); toast('Sesión iniciada');
       break;
     }
-    case 'authback': authStep = 'mail'; render(); break;
     case 'sololocal': soloLocal = true; try { localStorage.setItem('mi-rutina-solo-local', '1'); } catch (e) {} render(); break;
-    case 'gotologin': soloLocal = false; session = null; authStep = 'mail'; try { localStorage.removeItem('mi-rutina-solo-local'); } catch (e) {} render(); break;
+    case 'gotologin': soloLocal = false; session = null; try { localStorage.removeItem('mi-rutina-solo-local'); } catch (e) {} render(); break;
     case 'logout':
       confirmBox('¿Cerrar sesión? Los datos de este dispositivo se borran; tu información queda guardada en la nube y vuelve a aparecer al iniciar sesión.', 'Cerrar sesión', async () => {
         clearTimeout(flushTimer);
@@ -831,7 +818,7 @@ async function onAction(a, el){
         session = null; lastRemote = null; syncState = 'local'; soloLocal = false;
         S = blankState(); ui.tab = 'train';
         try { localStorage.removeItem(KEY); localStorage.removeItem('mi-rutina-uid'); localStorage.removeItem('mi-rutina-solo-local'); } catch (e) {}
-        authStep = 'mail'; render(); toast('Sesión cerrada');
+        render(); toast('Sesión cerrada');
       });
       break;
 
