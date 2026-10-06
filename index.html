@@ -91,7 +91,13 @@ h3{font-size:19px;line-height:1.2;font-weight:600}
 .icon{border:0;background:var(--field);border-radius:12px;width:44px;height:44px;font-size:24px;line-height:1;display:grid;place-items:center;color:var(--ink2);flex:0 0 auto}
 .link{border:0;background:none;color:var(--accent);font-weight:600;padding:4px 0;min-height:36px;font-size:15px}
 
-.rest{display:grid;gap:12px;margin-bottom:4px}
+.restwrap{position:sticky;top:var(--barh,64px);z-index:4;background:var(--bg);margin:0 -16px;padding:6px 16px 10px;box-shadow:0 10px 14px -14px rgba(15,31,46,.35)}
+.rest{display:grid;gap:12px;margin-bottom:0}
+.ex-top{cursor:pointer}
+.chev-ex{color:var(--muted);font-size:20px;line-height:1;margin-top:4px;transition:transform .2s;flex:0 0 auto}
+.ex.collapsed .chev-ex{transform:rotate(-90deg)}
+.ex.collapsed{padding-bottom:14px}
+.ex.collapsed .ex-top{margin:0}
 .rest-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .rt{font-family:var(--head);font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
 .rest-ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -392,7 +398,7 @@ function newProfile(name, blank){
 }
 
 /* ---------- Estado de la interfaz ---------- */
-const ui = {tab: 'train', dayId: null, week: mondayOf(new Date()), hist: null, edit: null, detail: {}, prShown: {}};
+const ui = {tab: 'train', dayId: null, week: mondayOf(new Date()), hist: null, edit: null, detail: {}, collapsed: {}, prShown: {}};
 const P = () => S.profiles.find(p => p.id === S.cur);
 const AR = p => p.routines.find(r => r.id === p.activeRid) || p.routines[0];
 const rest = {sel: 90, end: 0, timer: null};
@@ -442,6 +448,7 @@ function render(){
   tabs.style.display = 'flex';
   tabs.innerHTML = TABS.map(([id, label, ic]) => '<button data-tab="' + id + '" class="' + (ui.tab === id ? 'on' : '') + '" aria-current="' + (ui.tab === id ? 'page' : 'false') + '">' + ICON[ic] + '<span>' + label + '</span></button>').join('');
   bar.innerHTML = brand(p.name) + '<button class="sync" id="syncpill" data-act="gotoprofile"><i></i><span id="synctxt"></span></button>';
+  document.documentElement.style.setProperty('--barh', bar.offsetHeight + 'px');
   app.innerHTML = ui.tab === 'train' ? trainHTML(p) : ui.tab === 'hist' ? histHTML(p) : ui.tab === 'routine' ? routineHTML(p) : profileHTML(p);
   updateSyncUI(); updateRest();
 }
@@ -516,9 +523,11 @@ function trainHTML(p){
     const foot = '<div class="ex-foot"><input data-f="c" type="text" placeholder="Comentario (opcional)" value="' + esc(en ? en.c : '') + '" aria-label="Comentario">' +
       (canUni ? '<button class="btn sm ghost" data-act="togmode" data-id="' + e.id + '">' + (uni ? 'Serie por serie' : 'Todas iguales') + '</button>' : '') +
       (uni ? '' : '<button class="btn sm ghost" data-act="addset" data-id="' + e.id + '">+ Serie</button>') + '</div>';
-    return '<article class="card ex' + (isDone ? ' done' : '') + '" data-ex="' + e.id + '" data-mode="' + (uni ? 'uni' : 'det') + '">' +
-      '<div class="ex-top"><div class="ex-info"><h3 class="ex-name">' + esc(e.name) + pr + '</h3><div class="ex-meta">' + esc(e.muscle || 'Sin grupo') + (e.muscle ? ' · ' : '') + esc(e.sets) + ' series × ' + esc(e.reps) + ' reps</div></div><span class="tick" aria-hidden="true">✓</span></div>' +
-      hint + body + foot + '</article>';
+    const closed = !!ui.collapsed[e.id];
+    return '<article class="card ex' + (isDone ? ' done' : '') + (closed ? ' collapsed' : '') + '" data-ex="' + e.id + '" data-mode="' + (uni ? 'uni' : 'det') + '">' +
+      '<header class="ex-top" data-act="toggleex" data-id="' + e.id + '"><div class="ex-info"><h3 class="ex-name">' + esc(e.name) + pr + '</h3><div class="ex-meta">' + esc(e.muscle || 'Sin grupo') + (e.muscle ? ' · ' : '') + esc(e.sets) + ' series × ' + esc(e.reps) + ' reps</div></div>' +
+      '<span class="tick" aria-label="' + (isDone ? 'Realizado' : 'Pendiente') + '">✓</span><span class="chev-ex" aria-hidden="true">▾</span></header>' +
+      (closed ? '' : hint + body + foot) + '</article>';
   }).join('');
   const isCur = ui.week === thisWeek;
   return '<div class="lead"><div class="kicker">Hola, ' + esc(p.name) + '</div><h1>' + esc(r.name) + '</h1></div>' +
@@ -527,7 +536,7 @@ function trainHTML(p){
     '<section class="card weeknav"><button class="icon" data-act="wprev" aria-label="Semana anterior">‹</button>' +
     '<div class="lbl"><b>Semana del ' + esc(wShort(ui.week)) + '</b><span>' + (isCur ? 'Esta semana' : '<button class="link" data-act="wtoday">Volver a esta semana</button>') + '</span></div>' +
     '<button class="icon" data-act="wnext" aria-label="Semana siguiente">›</button></section>' +
-    restHTML() +
+    '<div class="restwrap">' + restHTML() + '</div>' +
     '<div class="dayhead"><h2>' + esc(day.name) + '</h2><span class="prog" id="prog">' + done + ' de ' + day.ex.length + '</span></div>' +
     (day.ex.length ? cards : '<div class="empty">Este día no tiene ejercicios. Agregalos en Rutinas.</div>');
 }
@@ -829,6 +838,7 @@ async function onAction(a, el){
     }
     case 'gotoprofile': ui.tab = 'profile'; ui.edit = null; ui.hist = null; render(); window.scrollTo(0, 0); break;
     case 'day': ui.dayId = id; render(); break;
+    case 'toggleex': ui.collapsed[id] = !ui.collapsed[id]; render(); break;
     case 'wprev': ui.week = addDays(ui.week, -7); render(); break;
     case 'wnext': ui.week = addDays(ui.week, 7); render(); break;
     case 'wtoday': ui.week = mondayOf(new Date()); render(); break;
