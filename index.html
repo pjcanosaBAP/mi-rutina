@@ -523,7 +523,7 @@ function trainHTML(p){
     const foot = '<div class="ex-foot"><input data-f="c" type="text" placeholder="Comentario (opcional)" value="' + esc(en ? en.c : '') + '" aria-label="Comentario">' +
       (canUni ? '<button class="btn sm ghost" data-act="togmode" data-id="' + e.id + '">' + (uni ? 'Serie por serie' : 'Todas iguales') + '</button>' : '') +
       (uni ? '' : '<button class="btn sm ghost" data-act="addset" data-id="' + e.id + '">+ Serie</button>') + '</div>';
-    const closed = !!ui.collapsed[e.id];
+    const closed = ui.collapsed[e.id] !== false;
     return '<article class="card ex' + (isDone ? ' done' : '') + (closed ? ' collapsed' : '') + '" data-ex="' + e.id + '" data-mode="' + (uni ? 'uni' : 'det') + '">' +
       '<header class="ex-top" data-act="toggleex" data-id="' + e.id + '"><div class="ex-info"><h3 class="ex-name">' + esc(e.name) + pr + '</h3><div class="ex-meta">' + esc(e.muscle || 'Sin grupo') + (e.muscle ? ' · ' : '') + esc(e.sets) + ' series × ' + esc(e.reps) + ' reps</div></div>' +
       '<span class="tick" aria-label="' + (isDone ? 'Realizado' : 'Pendiente') + '">✓</span><span class="chev-ex" aria-hidden="true">▾</span></header>' +
@@ -838,7 +838,7 @@ async function onAction(a, el){
     }
     case 'gotoprofile': ui.tab = 'profile'; ui.edit = null; ui.hist = null; render(); window.scrollTo(0, 0); break;
     case 'day': ui.dayId = id; render(); break;
-    case 'toggleex': ui.collapsed[id] = !ui.collapsed[id]; render(); break;
+    case 'toggleex': ui.collapsed[id] = ui.collapsed[id] === false; render(); break;
     case 'wprev': ui.week = addDays(ui.week, -7); render(); break;
     case 'wnext': ui.week = addDays(ui.week, 7); render(); break;
     case 'wtoday': ui.week = mondayOf(new Date()); render(); break;
