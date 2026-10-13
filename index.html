@@ -82,10 +82,9 @@ h3{font-size:19px;line-height:1.2;font-weight:600}
 .chips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 12px;padding:2px 16px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;min-height:40px;font-weight:600;font-size:15px;color:var(--ink2)}
-.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.dchip{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--line);vertical-align:middle}
-.dchip.part{background:var(--gold)}
-.dchip.full{background:var(--ok)}
+.chip.st-part{background:var(--gold-soft);border-color:var(--gold);color:var(--ink2)}
+.chip.st-full{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+button.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .wprog{margin:0 2px 14px}
 .wprog-l{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);font-weight:600}
 .bar-bg{height:8px;border-radius:999px;background:var(--field);border:1px solid var(--line);overflow:hidden;margin-top:6px}
@@ -533,7 +532,7 @@ function trainHTML(p){
   const thisWeek = mondayOf(new Date());
   const chips = r.days.map(d => {
     const st = dayStatus(p, d, ui.week);
-    return '<button class="chip ' + (d.id === day.id ? 'on' : '') + '" data-act="day" data-id="' + d.id + '"><span class="dchip ' + st + '"></span>' + esc(shortDay(d.name)) + '</button>';
+    return '<button class="chip st-' + st + (d.id === day.id ? ' on' : '') + '" data-act="day" data-id="' + d.id + '">' + esc(shortDay(d.name)) + '</button>';
   }).join('');
   let done = 0;
   const cards = day.ex.map(e => {
