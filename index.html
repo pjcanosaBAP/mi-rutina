@@ -83,6 +83,9 @@ h3{font-size:19px;line-height:1.2;font-weight:600}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 16px;min-height:40px;font-weight:600;font-size:15px;color:var(--ink2)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dchip{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--line);vertical-align:middle}
+.dchip.part{background:var(--gold)}
+.dchip.full{background:var(--ok)}
 
 .weeknav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px}
 .weeknav .lbl{flex:1;text-align:center;line-height:1.25}
@@ -503,13 +506,23 @@ function restHTML(){
   return '<section class="card rest"><div class="rest-top"><div class="kicker">Descanso entre series</div><span class="rt" id="rt">' + mmss(restLeft()) + '</span></div>' +
     '<div class="rest-ctl">' + presets + '<button class="btn sm primary" id="rbtn" data-act="rtoggle">' + (rest.end ? 'Parar' : 'Iniciar') + '</button></div></section>';
 }
+function dayStatus(p, d, week){
+  if (!d.ex.length) return 'none';
+  let n = 0;
+  d.ex.forEach(e => { const en = (p.logs[e.hk] || {})[week]; if (en && (en.w || en.r || en.s || en.c)) n++; });
+  if (!n) return 'none';
+  return n === d.ex.length ? 'full' : 'part';
+}
 function trainHTML(p){
   const r = AR(p);
   if (!r || !r.days.length) return '<div class="empty">Esta rutina no tiene días. Agregalos en la pestaña Rutinas.</div>';
   let day = r.days.find(d => d.id === ui.dayId);
   if (!day){ day = r.days[0]; ui.dayId = day.id; }
   const thisWeek = mondayOf(new Date());
-  const chips = r.days.map(d => '<button class="chip ' + (d.id === day.id ? 'on' : '') + '" data-act="day" data-id="' + d.id + '">' + esc(shortDay(d.name)) + '</button>').join('');
+  const chips = r.days.map(d => {
+    const st = dayStatus(p, d, ui.week);
+    return '<button class="chip ' + (d.id === day.id ? 'on' : '') + '" data-act="day" data-id="' + d.id + '"><span class="dchip ' + st + '"></span>' + esc(shortDay(d.name)) + '</button>';
+  }).join('');
   let done = 0;
   const cards = day.ex.map(e => {
     const en = (p.logs[e.hk] || {})[ui.week];
