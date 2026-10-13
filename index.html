@@ -86,6 +86,10 @@ h3{font-size:19px;line-height:1.2;font-weight:600}
 .dchip{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--line);vertical-align:middle}
 .dchip.part{background:var(--gold)}
 .dchip.full{background:var(--ok)}
+.wprog{margin:0 2px 14px}
+.wprog-l{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);font-weight:600}
+.bar-bg{height:8px;border-radius:999px;background:var(--field);border:1px solid var(--line);overflow:hidden;margin-top:6px}
+.bar-fg{height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
 
 .weeknav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px}
 .weeknav .lbl{flex:1;text-align:center;line-height:1.25}
@@ -506,6 +510,14 @@ function restHTML(){
   return '<section class="card rest"><div class="rest-top"><div class="kicker">Descanso entre series</div><span class="rt" id="rt">' + mmss(restLeft()) + '</span></div>' +
     '<div class="rest-ctl">' + presets + '<button class="btn sm primary" id="rbtn" data-act="rtoggle">' + (rest.end ? 'Parar' : 'Iniciar') + '</button></div></section>';
 }
+function weekProgress(p, r, week){
+  let total = 0, done = 0;
+  r.days.forEach(d => {
+    total += d.ex.length;
+    d.ex.forEach(e => { const en = (p.logs[e.hk] || {})[week]; if (en && (en.w || en.r || en.s || en.c)) done++; });
+  });
+  return {done, total, pct: total ? Math.round(done / total * 100) : 0};
+}
 function dayStatus(p, d, week){
   if (!d.ex.length) return 'none';
   let n = 0;
@@ -543,12 +555,14 @@ function trainHTML(p){
       (closed ? '' : hint + body + foot) + '</article>';
   }).join('');
   const isCur = ui.week === thisWeek;
+  const wp = weekProgress(p, r, ui.week);
   return '<div class="lead"><div class="kicker">Hola, ' + esc(p.name) + '</div><h1>' + esc(r.name) + '</h1></div>' +
     '<div class="warn" data-sync="warn" style="display:none"></div>' +
     '<div class="chips">' + chips + '</div>' +
     '<section class="card weeknav"><button class="icon" data-act="wprev" aria-label="Semana anterior">‹</button>' +
     '<div class="lbl"><b>Semana del ' + esc(wShort(ui.week)) + '</b><span>' + (isCur ? 'Esta semana' : '<button class="link" data-act="wtoday">Volver a esta semana</button>') + '</span></div>' +
     '<button class="icon" data-act="wnext" aria-label="Semana siguiente">›</button></section>' +
+    '<div class="wprog"><div class="wprog-l"><span>Progreso de la semana</span><span>' + wp.pct + '% · ' + wp.done + ' de ' + wp.total + '</span></div><div class="bar-bg"><div class="bar-fg" style="width:' + wp.pct + '%"></div></div></div>' +
     '<div class="restwrap">' + restHTML() + '</div>' +
     '<div class="dayhead"><h2>' + esc(day.name) + '</h2><span class="prog" id="prog">' + done + ' de ' + day.ex.length + '</span></div>' +
     (day.ex.length ? cards : '<div class="empty">Este día no tiene ejercicios. Agregalos en Rutinas.</div>');
@@ -608,6 +622,12 @@ function mutateSets(p, exId, fn){
   }
   save(); render();
 }
+/* Peso movido: suma de peso × repeticiones de cada serie (equivale a series × peso × reps cuando todas son iguales). */
+function volumeOf(e){
+  if (e.sets && e.sets.length) return e.sets.reduce((s, x) => s + (parseNum(x.w) || 0) * (parseNum(x.r) || 0), 0);
+  return (parseNum(e.w) || 0) * (parseNum(e.r) || 0) * (parseNum(e.s) || 1);
+}
+const fmtVol = n => Math.round(n).toLocaleString('es-AR');
 function setsDetail(e){
   if (!e.sets) return '';
   return e.sets.filter(x => x.w || x.r).map(x => (x.w ? fmtNum(parseNum(x.w) || 0) + ' kg' : '–') + (x.r ? ' × ' + x.r : '')).join(' · ');
@@ -667,9 +687,11 @@ function histDetailHTML(p, k){
     }
     const pr = isPR(p, k, w) ? '<span class="pill gold">Récord</span>' : '';
     const sd = setsDetail(e);
+    const vol = volumeOf(e);
     return '<button class="entry" data-act="hentry" data-w="' + w + '"><div class="l1"><span class="big">' + (e.w ? esc(e.w) + ' kg' : 'Sin peso') + '</span>' + delta + pr + '</div>' +
       '<div class="l2"><span>' + esc(srText(e) || '') + '</span><span class="wk">Sem. del ' + esc(wLong(w)) + '</span></div>' +
       (sd ? '<div class="setsd">' + esc(sd) + '</div>' : '') +
+      (vol ? '<div class="setsd">Peso movido: <b>' + fmtVol(vol) + ' kg</b></div>' : '') +
       (e.c ? '<div class="cm">“' + esc(e.c) + '”</div>' : '') +
       (e.rn ? '<span class="tag">' + esc(e.rn) + '</span>' : '') + '</button>';
   }).join('');
@@ -746,13 +768,13 @@ async function exportCSV(){
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   const dec = v => String(v == null ? '' : v).replace('.', ',');
   const nameOf = k => { const L = p.logs[k]; return L[Object.keys(L).sort().pop()].n; };
-  const out = [['Ejercicio', 'Semana del', 'Peso máx (kg)', 'Series', 'Reps', 'Detalle por serie', 'Comentario', 'Rutina', 'Diferencia (kg)']];
+  const out = [['Ejercicio', 'Semana del', 'Peso máx (kg)', 'Series', 'Reps', 'Detalle por serie', 'Peso movido (kg)', 'Comentario', 'Rutina', 'Diferencia (kg)']];
   Object.keys(p.logs).sort((a, b) => nameOf(a).localeCompare(nameOf(b))).forEach(k => {
     const L = p.logs[k]; let prev = null;
     weeksOf(L).forEach(w => {
       const e = L[w], cur = parseNum(e.w);
       const diff = cur !== null && prev !== null ? fmtNum(Math.round((cur - prev) * 100) / 100) : '';
-      out.push([e.n, wLong(w), dec(e.w), e.s, e.r, setsDetail(e), e.c, e.rn, dec(diff)]);
+      out.push([e.n, wLong(w), dec(e.w), e.s, e.r, setsDetail(e), Math.round(volumeOf(e)), e.c, e.rn, dec(diff)]);
       if (cur !== null) prev = cur;
     });
   });
